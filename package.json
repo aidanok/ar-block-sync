@@ -1,0 +1,26 @@
+{
+  "name": "ar-blocks",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "author": "therealaok@gmail.com",
+  "license": "MIT",
+  "dependencies": {
+    "@types/debug": "4.1.5",
+    "@types/level-js": "4.0.1",
+    "@types/levelup": "3.1.1",
+    "@types/memdown": "3.0.0",
+    "cross-fetch": "3.0.4",
+    "debug": "4.1.1",
+    "level-js": "5.0.0",
+    "leveldown": "5.3.0",
+    "levelup": "4.3.2",
+    "memdown": "5.1.0",
+    "promises-tho": "1.0.0",
+    "rxjs": "6.5.3"
+  },
+  "devDependencies": {
+    "ts-node": "8.4.1",
+    "typescript": "3.6.4"
+  }
+}
