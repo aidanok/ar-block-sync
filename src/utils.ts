@@ -1,5 +1,5 @@
 import { RawBlock } from './types';
-import { arweave, decodeTag, tagsArrayToObject } from './arweave';
+import { decodeTag, tagsArrayToObject } from './arweave';
 import fetch from 'cross-fetch';
 
 /**
@@ -64,7 +64,6 @@ export async function getTagsForTx(txId: string): Promise<Record<string, string>
  */
 export const randomDelayBetween = (minSeconds: number, maxSeconds: number) => {
   const ms = (Math.random() * ((maxSeconds - minSeconds)*1000)) + minSeconds*1000;
-  console.log(`Random delay of ${ms/1000} seconds`);
   return new Promise(res => setTimeout(res, ms));
 }
 

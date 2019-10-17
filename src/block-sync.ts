@@ -1,11 +1,10 @@
-import { WatchedBlock, SyncResult, BlockWatcherOptions } from './types';
+import { WatchedBlock, SyncResult, BlockWatcherOptions, RawBlock, BlockTags } from './types';
 import { getBlockAtHeight, range, getTagsForTx } from './utils';
 import { batch, batchWithProgress, BatchJob } from 'promises-tho';
-import { RawBlock } from '.';
 import { retryWithBackoff } from 'promises-tho';
+
 import debug from 'debug';
 import fetch from 'cross-fetch';
-
 
 // Configure some functions we will use later. The retries are quite
 // often used with these due to block propogation. With a setting of 7 tries
@@ -27,17 +26,31 @@ const updateTxTags = ({ b, tx }: { b: WatchedBlock, tx: string }) => {
 // Wrapped versions that execute in batches to not tie up all network connections
 // while retrieving multiple items at once. 
 
-const getBlocksBatch = batchWithProgress({ batchSize: 4, batchDelayMs: 50 }, getBlock);
+const getBlocksBatch = batchWithProgress({ batchSize: 4, batchDelayMs: 250 }, getBlock);
 
-const updateTxTagsBatch = batch({ batchSize: 4, batchDelayMs: 100 }, updateTxTags);
+const updateTxTagsBatch = batch({ batchSize: 2, batchDelayMs: 350 }, updateTxTags);
 
-const log = debug('ar-blocks:sync');
+const log = debug('ar-block-sync:sync');
+ 
+/**
+ * Checks a list of blocks for consistency by comparing previous_block to indep_hash
+ * Throws if check fails.
+ * 
+ * @param blocks 
+ */
+export function consistencyCheck(blocks: WatchedBlock[]): void {
+  for (let i = 1; i < blocks.length; i++) {
+    if (blocks[i].info.previous_block !== blocks[i-1].info.indep_hash) {
+      throw new Error(`Consitency check failed: Block ${blocks[i-1].info.height} -> ${blocks[i].info.height}`);
+    }
+  }
+}
 
 /**
  * A version of iterate() that has backoff to 5 minutes on errors but never gives up. 
  * Probably this should give up so main() can handle shutdown gracefully.
  */
-export const iterateWithBackoff = retryWithBackoff({ tries: Number.POSITIVE_INFINITY, startMs: 300, pow: 4 }, iterate);
+export const iterateWithBackoff = retryWithBackoff({ tries: Number.POSITIVE_INFINITY, startMs: 300, pow: 4 }, syncIteration);
 
 /**
  * Run a single sync iteration.
@@ -45,13 +58,12 @@ export const iterateWithBackoff = retryWithBackoff({ tries: Number.POSITIVE_INFI
  * @param inBlocks a list of the current blocks we have, must be sorted by height, low->high.  
  * @param options the sync options.
  */
-export async function iterate(inBlocks: WatchedBlock[], options: BlockWatcherOptions): Promise<SyncResult> {
+export async function syncIteration(inBlocks: WatchedBlock[], options: BlockWatcherOptions): Promise<SyncResult> {
      
   log(`Polling`);
  
   const findInBlocks = (height: number) => inBlocks.find(x => x.info.height === height);
-  const findIndexInBlocks = (height: number) => inBlocks.findIndex(x => x.info.height === height);
-
+ 
   const netInfo = await fetch('https://arweave.net/info').then(resp => resp.json());
   const ourTop = inBlocks[inBlocks.length-1];
   const ourHeight = ourTop ? ourTop.info.height : 0;
@@ -75,15 +87,18 @@ export async function iterate(inBlocks: WatchedBlock[], options: BlockWatcherOpt
       synced: 0,
       missed: false,
       reorg: false,
+      discarded: [],
     };
   }
+
   if (ourHeight === netInfo.height && netInfo.current === ourHash) {
-    log('Top is synced, nothing to do.');
+    log(`Top is synced at ${netInfo.height}. Nothing to do.`);
     return {
       list: inBlocks,
       synced: 0,
       missed: false,
       reorg: false,
+      discarded: [],
     }; 
   }
 
@@ -95,6 +110,7 @@ export async function iterate(inBlocks: WatchedBlock[], options: BlockWatcherOpt
       synced: 0,
       missed: false,
       reorg: false,
+      discarded: [],
     }; 
   }
 
@@ -111,6 +127,8 @@ export async function iterate(inBlocks: WatchedBlock[], options: BlockWatcherOpt
   // the oldest height we are interested in.
   const oldestHeight = netInfo.height - options.blocksToSync;
 
+  // the blocks we know we need to retrieve, we may need to 
+  // more if there was a re-org.
   const blockHeights = range(netInfo.height-count+1, count);
 
   let job: BatchJob<number, RawBlock> = {
@@ -175,46 +193,54 @@ export async function iterate(inBlocks: WatchedBlock[], options: BlockWatcherOpt
     }
   }
 
-  // Re-org fixing finished.
+  // Re-org checking finished.
 
-  if (discarded.length > 0) {
-    discarded.forEach(b => {
-      log(`Discarded: Height: ${b.info.height}, Hash: ${b.info.indep_hash.substr(0, 5)}, Prev: ${b.info.previous_block.substr(0, 5)}`)
-    })
-    log(`Discarded ${discarded.length} due to re-org`)
+  // All the new blocks we go, including any re-org.
+  const newBlocks = receviedRawBlocks.map(x => ({tags: {} as BlockTags, info: x }));
+
+  // set tags to 'null' to indicate they haven't been retrieved. 
+  for (const b of newBlocks) {
+    for (const txId of b.info.txs) {
+      b.tags[txId] = null;
+    }
   }
 
-  // Watched will contain all the new blocks
-  const newBlocks = receviedRawBlocks.map(x => ({tags: {}, info: x }));
+  log(`Prev blocks: ${inBlocks[0].info.height} -> ${inBlocks[inBlocks.length-1].info.height} (${inBlocks.length})`)
+  log(`New blocks: ${newBlocks[0].info.height} -> ${newBlocks[newBlocks.length-1].info.height} (${newBlocks.length})`);
+  if (discarded.length) {
+    log(`Discarded blocks: ${discarded[0].info.height} -> ${discarded[discarded.length-1].info.height} (${discarded.length})`);
+  }
 
-  // prep array for batch get of all tags.
-  const btxs = [] as { b: WatchedBlock, tx: string}[];
-  Object.values(newBlocks)
-    .forEach(b => { 
-      b.info.txs.forEach(tx => { btxs.push({b, tx})
-    })
-  });
-  // this will fill in all tx tags for all blocks.
-  await updateTxTagsBatch(btxs);
+  // get rid of discard blocks from the end of inBlocks, concat newBlocks, and trim to 
+  // max size.
+  const outBlocks = (
+    inBlocks
+    .slice(-discarded.length)
+    .concat(newBlocks)
+  ).slice(-options.blocksToSync);
 
-  log(`Synced from ${newBlocks[0].info.height} to ${newBlocks[newBlocks.length-1].info.height}`);
-  
-  // const trimIndex = Math.max(findIndexInBlocks(newBlocks[0].info.height) - 1, 0);
-  
-  const outBlocks = (inBlocks.concat(newBlocks)).slice(-options.blocksToSync);
+  log(`Final blocks: ${outBlocks[0].info.height} -> ${outBlocks[outBlocks.length-1].info.height} (${outBlocks.length})`);
 
-  // save to persistence.
-  //await db.updateMultipleBlocks(newBlocks);
-  //await db.trimPastHeight(oldestHeight+1);
-  
-  // get all the blocks back out of persistence, and emit to subscribers. 
-  //const allBlocks = await db.allBlocks();
-  
+  if (options.retrieveTags) {
+    log(`Retrieving TX tags`);
+    const txBatch = [] as { b: WatchedBlock, tx: string}[];
+    for (const b of outBlocks) {
+      for (const tx of b.info.txs) {
+        if (!b.tags[tx]) {
+          txBatch.push({ b, tx });
+        }
+      }
+    }
+    log(`Retrieving tags for ${txBatch.length} TXs in total`);
+    await updateTxTagsBatch(txBatch);
+  }
+
   const syncResult: SyncResult = {
     synced: newBlocks.length,
     reorg: detectedReorg,
     missed: newBlocks.length === outBlocks.length, 
     list: outBlocks,
+    discarded
   }
 
   return syncResult;

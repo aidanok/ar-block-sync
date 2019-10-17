@@ -9,9 +9,9 @@ test();*/
 
 
 import { iterateWithBackoff } from './block-sync';
-import { WatchedBlock, BlockWatcherOptions } from '.';
 import { inspect } from 'util';
 import { randomDelayBetween } from './utils';
+import { WatchedBlock, BlockWatcherOptions } from './types';
 
 async function runTest() {
   const blocks: WatchedBlock[] = [];

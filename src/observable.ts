@@ -1,43 +1,43 @@
 import { Observable, Observer } from "rxjs";
 import { shareReplay } from "rxjs/operators";
 import { BlocksDatabase } from "./block-db";
-import { iterateWithBackoff } from "./block-sync";
+import { iterateWithBackoff, consistencyCheck } from "./block-sync";
 import { randomDelayBetween } from "./utils";
 import { BlockWatcherOptions, SyncResult } from "./types";
 import debug from "debug";
 
 
 /**
- * Observable that will allow multiple subscribers and replay 
- * the last value to them when they subscribe. Generally you 
- * should use this. 
+ * Observable that can be shared between multiple subscribers and 
+ * replays the last value to them when they subscribe. Generally you 
+ * should use this over the direct source observable.
  * 
  * @param opts 
  */
 export function arBlocks(opts?: Partial<BlockWatcherOptions>): Observable<SyncResult> {
-  return blocksObs(opts).pipe(
+  return blocksObservable(opts).pipe(
     shareReplay(1)
   );
 }
 
 /**
- * The single source Observable.
+ * The source Observable.
  * 
  * @param opts 
  */
-export function blocksObs(opts?: Partial<BlockWatcherOptions>): Observable<SyncResult> {
+export function blocksObservable(opts?: Partial<BlockWatcherOptions>): Observable<SyncResult> {
   const options: BlockWatcherOptions = 
   
   Object.assign({
-    minPollTime: 65,
-    maxPollTime: 150,
+    minPollTime: 100,
+    maxPollTime: 200,
     blocksToSync: 20,
     startupDelay: 120,
-    persist: false,
+    persist: true,
     retrieveTags: false,
   }, opts);
 
-  const log = debug('ar-blocks:main');
+  const log = debug('ar-block-sync:main');
 
   return Observable.create((observer: Observer<SyncResult>) => {
     let isShuttingDown = false; 
@@ -64,7 +64,9 @@ export function blocksObs(opts?: Partial<BlockWatcherOptions>): Observable<SyncR
         blocks = [];
       }
 
-      // Loop
+      consistencyCheck(blocks);
+
+      // Main loop
       while (!isShuttingDown) {
         
         const result = await iterateWithBackoff(blocks, options);
@@ -79,14 +81,19 @@ export function blocksObs(opts?: Partial<BlockWatcherOptions>): Observable<SyncR
           return; 
         }
 
-        if (result.synced > 0 || firstIteration) {
-          observer.next(result);  
-        }
+        observer.next(result);
 
         firstIteration = false;
         blocks = result.list;
-      
-        log(`synced blocks: ${blocks.map(x => x.info.height).join(',')}`);
+        
+        consistencyCheck(blocks);
+        
+        if (blocks.length) {
+          log(`synced blocks: ${blocks[0].info.height} -> ${blocks[blocks.length-1].info.height} (${blocks.length})`);
+        }
+        else {
+          log(`!!no synced blocks!!`);
+        }
 
         const bottomHeight = blocks[0].info.height;
         if (options.persist) {
@@ -97,10 +104,10 @@ export function blocksObs(opts?: Partial<BlockWatcherOptions>): Observable<SyncR
             log(`persisted ${blocks.length} blocks, trimming past ${bottomHeight}`);
             db.trimPastHeight(bottomHeight);
           })
-          .catch(er => {
+          .catch(er => { 
             console.error(er); // ? 
             log(`Got error persisting DB!`);
-            })
+          })
         }
 
         await randomDelayBetween(options.minPollTime, options.maxPollTime);

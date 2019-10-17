@@ -24,9 +24,16 @@ export interface RawBlock {
   indep_hash: string 
 }
 
+/**
+ * Block tags may be txId = null | undefined if we haven't 
+ * got the tags for some reason, or it will be 
+ * tx = { ... } if we have.
+ */
+export type BlockTags = Record<string, undefined | null | Record<string, string>>
+
 export interface WatchedBlock {
   info: RawBlock
-  tags: Record<string, null | Record<string, string>>
+  tags: BlockTags
 }
 
 export interface BlockWatcherSubscriber {
@@ -42,5 +49,5 @@ export interface SyncResult {
   list: WatchedBlock[],
   missed: boolean,
   reorg: boolean,
-  discarded?: WatchedBlock[]
+  discarded: WatchedBlock[]
 }

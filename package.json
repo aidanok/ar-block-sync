@@ -1,5 +1,5 @@
 {
-  "name": "ar-blocks",
+  "name": "ar-block-sync",
   "version": "1.0.0",
   "description": "",
   "keywords": [],
@@ -19,7 +19,29 @@
     "promises-tho": "1.0.0",
     "rxjs": "6.5.3"
   },
+  "@pika/pack": {
+    "pipeline": [
+      [
+        "@pika/plugin-ts-standard-pkg"
+      ],
+      [
+        "@pika/plugin-build-node"
+      ],
+      [
+        "@pika/plugin-build-web"
+      ],
+      [
+        "@pika/plugin-build-deno"
+      ]
+    ]
+  },
   "devDependencies": {
+    "@pika/pack": "0.5.0",
+    "@pika/plugin-build-deno": "0.6.1",
+    "@pika/plugin-build-node": "0.6.1",
+    "@pika/plugin-build-web": "0.6.1",
+    "@pika/plugin-ts-standard-pkg": "0.6.1",
+    "@pika/types": "0.6.1",
     "ts-node": "8.4.1",
     "typescript": "3.6.4"
   }
