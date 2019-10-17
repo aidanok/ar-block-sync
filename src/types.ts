@@ -1,4 +1,8 @@
 
+/**
+ * These are the options the 'main' loop uses.
+ * 
+ */
 export interface BlockWatcherOptions {
   minPollTime: number 
   maxPollTime: number
@@ -8,6 +12,9 @@ export interface BlockWatcherOptions {
   retrieveTags: boolean 
 }
 
+/**
+ * These are the options the syncIteration uses.
+ */
 export interface SyncOptions {
   blocksToSync: boolean 
   retrieveTags: boolean
@@ -25,15 +32,14 @@ export interface RawBlock {
 }
 
 /**
- * Block tags may be txId = null | undefined if we haven't 
- * got the tags for some reason, or it will be 
- * tx = { ... } if we have.
+ * tags.txId = null                         - if we haven't got the tags
+ * tags.txId = { tag: value, tag: value }   - if we have the tags.
  */
-export type BlockTags = Record<string, undefined | null | Record<string, string>>
+export type BlockTxTags = Record<string, null | Record<string, string>>
 
-export interface WatchedBlock {
+export interface SyncedBlock {
   info: RawBlock
-  tags: BlockTags
+  tags: BlockTxTags
 }
 
 export interface BlockWatcherSubscriber {
@@ -46,8 +52,8 @@ export interface SubscriberOptions {
 
 export interface SyncResult {
   synced: number,
-  list: WatchedBlock[],
+  list: SyncedBlock[],
   missed: boolean,
   reorg: boolean,
-  discarded: WatchedBlock[]
+  discarded: SyncedBlock[]
 }

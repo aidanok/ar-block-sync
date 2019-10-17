@@ -4,6 +4,7 @@ import { BlocksDatabase } from "./block-db";
 import { iterateWithBackoff, consistencyCheck } from "./block-sync";
 import { randomDelayBetween } from "./utils";
 import { BlockWatcherOptions, SyncResult } from "./types";
+
 import debug from "debug";
 
 
@@ -21,7 +22,22 @@ export function arBlocks(opts?: Partial<BlockWatcherOptions>): Observable<SyncRe
 }
 
 /**
- * The source Observable.
+ * 
+ * The source Observable. This runs the 'main' loop that first loads blocks from persistence,
+ * runs a syncIteration, and persists blocks back. 
+ * 
+ * Its written as an Observable just to take advantage of RxJs subscriber, sharing, replay 
+ * functionalities. 
+ * 
+ * TODO: support syncing higher counts of blocks by 
+ *  - only persisting new or changed blocks
+ *  - not nessecarily loading the entire block list, or passing the entire block list
+ *  - to syncIteration. 
+ * 
+ * TODO: support increasing the amount of blocks to sync without just clearing the DB. 
+ *       just needs the ability to retrieve blocks starting from the bottom of the list we
+ *       already have.
+ * 
  * 
  * @param opts 
  */
@@ -88,26 +104,24 @@ export function blocksObservable(opts?: Partial<BlockWatcherOptions>): Observabl
         
         consistencyCheck(blocks);
         
-        if (blocks.length) {
+        if (result.synced > 0) {
+          // Persist new list. 
           log(`synced blocks: ${blocks[0].info.height} -> ${blocks[blocks.length-1].info.height} (${blocks.length})`);
-        }
-        else {
-          log(`!!no synced blocks!!`);
-        }
-
-        const bottomHeight = blocks[0].info.height;
-        if (options.persist) {
-          
-          // hmm should we await? doesn't really matter.
-          db.updateMultipleBlocks(blocks)
-          .then(_ => {
-            log(`persisted ${blocks.length} blocks, trimming past ${bottomHeight}`);
-            db.trimPastHeight(bottomHeight);
-          })
-          .catch(er => { 
-            console.error(er); // ? 
-            log(`Got error persisting DB!`);
-          })
+        
+          const bottomHeight = blocks[0].info.height;
+          if (options.persist) {
+            
+            // hmm should we await? doesn't really matter.
+            db.updateMultipleBlocks(blocks)
+            .then(_ => {
+              log(`persisted ${blocks.length} blocks, trimming past ${bottomHeight}`);
+              db.trimPastHeight(bottomHeight);
+            })
+            .catch(er => { 
+              console.error(er); // ? 
+              log(`Got error persisting DB!`);
+            })
+          }
         }
 
         await randomDelayBetween(options.minPollTime, options.maxPollTime);

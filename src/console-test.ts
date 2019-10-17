@@ -11,10 +11,10 @@ test();*/
 import { iterateWithBackoff } from './block-sync';
 import { inspect } from 'util';
 import { randomDelayBetween } from './utils';
-import { WatchedBlock, BlockWatcherOptions } from './types';
+import { SyncedBlock, BlockWatcherOptions } from './types';
 
 async function runTest() {
-  const blocks: WatchedBlock[] = [];
+  const blocks: SyncedBlock[] = [];
   const options: BlockWatcherOptions = {
     minPollTime: 65,
     maxPollTime: 150,
@@ -38,7 +38,7 @@ async function runTest() {
 }
 
 
-function dumpBlock(b: WatchedBlock) {
+function dumpBlock(b: SyncedBlock) {
   console.log(`\n-----\nBlock ${b.info.height}: ${b.info.indep_hash.substr(0, 5)}, prev: ${b.info.previous_block.substr(0, 5)}}`)
   Object.keys(b.tags).forEach(tx => {
     console.log(`--- ${tx.substr(0, 4)}`);

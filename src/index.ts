@@ -1,4 +1,4 @@
-import { SyncResult, RawBlock, BlockWatcherOptions, WatchedBlock } from "./types";
+import { SyncResult, RawBlock, BlockWatcherOptions, SyncedBlock } from "./types";
 import { arBlocks } from "./observable";
 
-export { arBlocks, SyncResult, RawBlock, BlockWatcherOptions, WatchedBlock }
+export { arBlocks, SyncResult, RawBlock, BlockWatcherOptions, SyncedBlock as WatchedBlock }

@@ -1,4 +1,4 @@
-import { WatchedBlock, SyncResult, BlockWatcherOptions, RawBlock, BlockTags } from './types';
+import { SyncedBlock, SyncResult, BlockWatcherOptions, RawBlock, BlockTxTags } from './types';
 import { getBlockAtHeight, range, getTagsForTx } from './utils';
 import { batch, batchWithProgress, BatchJob } from 'promises-tho';
 import { retryWithBackoff } from 'promises-tho';
@@ -18,7 +18,7 @@ const getTxTags = retryWithBackoff({ tries: 7 }, getTagsForTx);
 
 // update the WatchedBlock with the result of a tags retrieval 
 // throw if we cant retrieve tags. 
-const updateTxTags = ({ b, tx }: { b: WatchedBlock, tx: string }) => {
+const updateTxTags = ({ b, tx }: { b: SyncedBlock, tx: string }) => {
   return getTxTags(tx)
   .then(tags => { b.tags[tx] = tags })
 }
@@ -38,7 +38,7 @@ const log = debug('ar-block-sync:sync');
  * 
  * @param blocks 
  */
-export function consistencyCheck(blocks: WatchedBlock[]): void {
+export function consistencyCheck(blocks: SyncedBlock[]): void {
   for (let i = 1; i < blocks.length; i++) {
     if (blocks[i].info.previous_block !== blocks[i-1].info.indep_hash) {
       throw new Error(`Consitency check failed: Block ${blocks[i-1].info.height} -> ${blocks[i].info.height}`);
@@ -58,7 +58,7 @@ export const iterateWithBackoff = retryWithBackoff({ tries: Number.POSITIVE_INFI
  * @param inBlocks a list of the current blocks we have, must be sorted by height, low->high.  
  * @param options the sync options.
  */
-export async function syncIteration(inBlocks: WatchedBlock[], options: BlockWatcherOptions): Promise<SyncResult> {
+export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatcherOptions): Promise<SyncResult> {
      
   log(`Polling`);
  
@@ -168,7 +168,7 @@ export async function syncIteration(inBlocks: WatchedBlock[], options: BlockWatc
   // most cases. We just walk back one block at a time. 
     
   let fixingReorg = detectedReorg;
-  let discarded = [] as WatchedBlock[];
+  let discarded = [] as SyncedBlock[];
   let height = receviedRawBlocks[0].height - 1;
   
   while (fixingReorg && height > oldestHeight) {
@@ -196,7 +196,7 @@ export async function syncIteration(inBlocks: WatchedBlock[], options: BlockWatc
   // Re-org checking finished.
 
   // All the new blocks we go, including any re-org.
-  const newBlocks = receviedRawBlocks.map(x => ({tags: {} as BlockTags, info: x }));
+  const newBlocks = receviedRawBlocks.map(x => ({tags: {} as BlockTxTags, info: x }));
 
   // set tags to 'null' to indicate they haven't been retrieved. 
   for (const b of newBlocks) {
@@ -205,8 +205,12 @@ export async function syncIteration(inBlocks: WatchedBlock[], options: BlockWatc
     }
   }
 
-  log(`Prev blocks: ${inBlocks[0].info.height} -> ${inBlocks[inBlocks.length-1].info.height} (${inBlocks.length})`)
-  log(`New blocks: ${newBlocks[0].info.height} -> ${newBlocks[newBlocks.length-1].info.height} (${newBlocks.length})`);
+  if (inBlocks.length) {
+    log(`Prev blocks: ${inBlocks[0].info.height} -> ${inBlocks[inBlocks.length-1].info.height} (${inBlocks.length})`)
+  }
+  if (newBlocks.length) {
+    log(`New blocks: ${newBlocks[0].info.height} -> ${newBlocks[newBlocks.length-1].info.height} (${newBlocks.length})`);
+  }
   if (discarded.length) {
     log(`Discarded blocks: ${discarded[0].info.height} -> ${discarded[discarded.length-1].info.height} (${discarded.length})`);
   }
@@ -223,7 +227,7 @@ export async function syncIteration(inBlocks: WatchedBlock[], options: BlockWatc
 
   if (options.retrieveTags) {
     log(`Retrieving TX tags`);
-    const txBatch = [] as { b: WatchedBlock, tx: string}[];
+    const txBatch = [] as { b: SyncedBlock, tx: string}[];
     for (const b of outBlocks) {
       for (const tx of b.info.txs) {
         if (!b.tags[tx]) {

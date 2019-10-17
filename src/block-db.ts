@@ -81,8 +81,11 @@ export class BlocksDatabase {
   }
 
   /**
-   * Inserts/updates multiple blocks in a batch. 
-   * Accepts a sparse array.
+   * Inserts/updates multiple blocks in a batch operation.
+   *  
+   * Accepts blocks in any order or in a sparse arrray,
+   * since it will use the blocks own reported height 
+   * as a key rather than anything to do with the array index.
    * 
    * @param blocks 
    */
@@ -122,7 +125,7 @@ export class BlocksDatabase {
    */
   public async tryGetBlock(height: number): Promise<WatchedBlock | undefined> {
     const key = stringifyNumber(height);
-    const val: any = await this.db.get(key);
+    const val: any = await this.db.tryGet(key);
     if (val) {
       return JSON.parse(val);
     }
@@ -208,10 +211,14 @@ export class BlocksDatabase {
  * Stringify a number padding with leading zeros
  * so its sorted in leveldb (lexographic sorting) 
  * 
+ * We might want to reverse the string so newest blocks
+ * are sorted first if we were to be storing large numbers
+ * of blocks.
+ * 
  * @param x 
  */
 function stringifyNumber(x: number) {
-  return `00000000000${x}`.slice(-11);
+  return `0000000000000${x}`.slice(-12);
 }
 
 
