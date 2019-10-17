@@ -1,6 +1,6 @@
 import { RawBlock } from './types';
 import { decodeTag, tagsArrayToObject } from './arweave';
-import fetch from 'cross-fetch';
+import 'cross-fetch/polyfill';
 
 /**
  * 

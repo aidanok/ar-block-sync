@@ -4,7 +4,7 @@ import { batch, batchWithProgress, BatchJob } from 'promises-tho';
 import { retryWithBackoff } from 'promises-tho';
 
 import debug from 'debug';
-import fetch from 'cross-fetch';
+import 'cross-fetch/polyfill';
 
 // Configure some functions we will use later. The retries are quite
 // often used with these due to block propogation. With a setting of 7 tries
@@ -45,7 +45,6 @@ export function consistencyCheck(blocks: SyncedBlock[]): void {
     }
   }
 }
-
 
 /**
  * Run a single sync iteration.
@@ -244,7 +243,3 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
 
   return syncResult;
 }
-
-
-
-
