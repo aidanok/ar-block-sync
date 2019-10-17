@@ -46,11 +46,6 @@ export function consistencyCheck(blocks: SyncedBlock[]): void {
   }
 }
 
-/**
- * A version of iterate() that has backoff to 5 minutes on errors but never gives up. 
- * Probably this should give up so main() can handle shutdown gracefully.
- */
-export const iterateWithBackoff = retryWithBackoff({ tries: Number.POSITIVE_INFINITY, startMs: 300, pow: 4 }, syncIteration);
 
 /**
  * Run a single sync iteration.

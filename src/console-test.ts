@@ -8,7 +8,7 @@ async function test() {
 test();*/
 
 
-import { iterateWithBackoff } from './block-sync';
+import { syncIteration } from './block-sync';
 import { inspect } from 'util';
 import { randomDelayBetween } from './utils';
 import { SyncedBlock, BlockWatcherOptions } from './types';
@@ -24,15 +24,15 @@ async function runTest() {
     retrieveTags: true, // sync option
   }
 
-  let result = await iterateWithBackoff(blocks, options);
+  let result = await syncIteration(blocks, options);
   result.list.forEach(dumpBlock);
   
   await randomDelayBetween(30, 60);
-  result = await iterateWithBackoff(blocks, options);
+  result = await syncIteration(blocks, options);
   result.list.forEach(dumpBlock);
   
   await randomDelayBetween(30, 60);
-  result = await iterateWithBackoff(blocks, options);
+  result = await syncIteration(blocks, options);
   result.list.forEach(dumpBlock);
     
 }

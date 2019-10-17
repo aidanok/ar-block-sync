@@ -1,7 +1,7 @@
 import { Observable, Observer } from "rxjs";
 import { shareReplay } from "rxjs/operators";
 import { BlocksDatabase } from "./block-db";
-import { iterateWithBackoff, consistencyCheck } from "./block-sync";
+import { syncIteration, consistencyCheck } from "./block-sync";
 import { randomDelayBetween } from "./utils";
 import { BlockWatcherOptions, SyncResult } from "./types";
 
@@ -80,19 +80,42 @@ export function blocksObservable(opts?: Partial<BlockWatcherOptions>): Observabl
         blocks = [];
       }
 
-      consistencyCheck(blocks);
+      // If we are in production we can just clear the db, otherwise
+      // halt. 
+      try {
+        consistencyCheck(blocks);
+      } catch (e) {
+        console.error(`consistency check failed`)
+        await db.debugDump();
+        if (process.env.NODE_ENV == 'production') {
+          console.error(`Clearing DB due to consistency problems. This is a bug that should be fixed`);
+          await db.clearDb();
+          blocks = [];
+        }
+        else {
+          throw(e);
+        }
+      }
 
       // Main loop
       while (!isShuttingDown) {
         
-        const result = await iterateWithBackoff(blocks, options);
-        
-        // Not sure if needed, but the above await can potentially 
-        // take a very long time, so if we have been told to shutdown
-        // while it completes we may aswell not do anymore work.
-        // In fact, the above await may never return... if network
-        // is down it will retry forever.. ! perhaps it should 
-        // have a limit on retries.
+        let result: SyncResult;
+
+        try { 
+          result = await syncIteration(blocks, options);
+        } catch (e) {
+          // This can be normal enough. we might want to wrap syncIteration 
+          // with a backoff, but we are already waiting between iterations anyway.
+          console.warn(e);
+          console.warn(`Caught error during sync iteration, will try again`);
+          // delay and continue while() loop.
+          await randomDelayBetween(options.minPollTime, options.maxPollTime);
+          continue;
+        }
+
+        // If we've been told to shutdown, dont do any more work. 
+
         if (isShuttingDown) {
           return; 
         }
@@ -101,8 +124,12 @@ export function blocksObservable(opts?: Partial<BlockWatcherOptions>): Observabl
 
         firstIteration = false;
         blocks = result.list;
-        
-        consistencyCheck(blocks);
+        try {
+          consistencyCheck(blocks);
+        } catch (e) {
+          console.error(`consistency check failed`)
+          db.debugDump();
+        }
         
         if (result.synced > 0) {
           // Persist new list. 
