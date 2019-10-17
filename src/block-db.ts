@@ -190,20 +190,22 @@ export class BlocksDatabase {
    * 
    */
   public debugDump() {
-    let i = 0;
-    this.db.createReadStream({ reverse: true })
-      .on('data', (data) => {
-        if (!data.key) {
-          console.log('got not key');
-          return; 
-        }
-        const wb: WatchedBlock = JSON.parse(data.value);
-        const t = ((Date.now() / 1000) - wb.info.timestamp) / 60;
-        console.log(`${++i} - ${data.key} - ${t.toFixed(2)} Minutes Ago, Hash:${wb.info.indep_hash.substr(0, 5)}, Prev: ${wb.info.previous_block.substr(0, 5)}`);
+    return new Promise((res) => {
+      let i = 0;
+      this.db.createReadStream({ reverse: true })
+        .on('data', (data) => {
+          if (!data.key) {
+            console.log('got not key');
+            return; 
+          }
+          const wb: WatchedBlock = JSON.parse(data.value);
+          const t = ((Date.now() / 1000) - wb.info.timestamp) / 60;
+          console.log(`${++i} - ${data.key} - ${t.toFixed(2)} Minutes Ago, Hash:${wb.info.indep_hash.substr(0, 5)}, Prev: ${wb.info.previous_block.substr(0, 5)}`);
+        })
+        .on('error', er => { throw(er) })
+        .on('close', res)
       })
-      .on('error', er => { throw(er) });
-  }
-  
+  };
 
 }
 
@@ -218,7 +220,7 @@ export class BlocksDatabase {
  * @param x 
  */
 function stringifyNumber(x: number) {
-  return `0000000000000${x}`.slice(-12);
+  return `00000000000000${x}`.slice(-13);
 }
 
 
