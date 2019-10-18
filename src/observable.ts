@@ -120,16 +120,21 @@ export function blocksObservable(opts?: Partial<BlockWatcherOptions>): Observabl
           return; 
         }
 
-        observer.next(result);
-
-        firstIteration = false;
-        blocks = result.list;
         try {
           consistencyCheck(blocks);
         } catch (e) {
           console.error(`consistency check failed`)
-          db.debugDump();
+          await db.debugDump();
+          // we could.., clear db and recover here same as above, only in production mode..
+          // honestly, consitencyCheck should never fail, it just indicates bug in syncIteration.
+          throw(e);
         }
+        
+
+        observer.next(result);
+
+        firstIteration = false;
+        blocks = result.list;
         
         if (result.synced > 0) {
           // Persist new list. 

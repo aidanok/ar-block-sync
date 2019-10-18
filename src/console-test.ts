@@ -37,14 +37,10 @@ async function runTest() {
     
 }
 
-
 function dumpBlock(b: SyncedBlock) {
   console.log(`\n-----\nBlock ${b.info.height}: ${b.info.indep_hash.substr(0, 5)}, prev: ${b.info.previous_block.substr(0, 5)}}`)
-  Object.keys(b.tags).forEach(tx => {
-    console.log(`--- ${tx.substr(0, 4)}`);
-    Object.keys(b.tags[tx]!).forEach(tag => {
-      console.log(`----- ${tag} ${b.tags[tx]![tag].substr(0, 10)}`);
-    })
+  Object.keys(b.transactions).forEach(tx => {
+    console.log(`--- ${inspect(tx)}`);
   })
 }
 

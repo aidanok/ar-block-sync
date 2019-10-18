@@ -1,3 +1,4 @@
+import { DecodedTag } from "./arweave";
 
 /**
  * These are the options the 'main' loop uses.
@@ -22,24 +23,46 @@ export interface SyncOptions {
 
 // Partial typing of the raw block format from the /blocks endpoint.
 export interface RawBlock {
+  nonce: string 
+  hash: string 
   txs: string[]
-  previous_block: string
   height: number
+  
+  /**
+   * Timestamp, unix seconds
+   */
   timestamp: number 
-  block_size: number
-  /* Block Hash */
+  
+  /**
+   * Timestamp, unix seconds
+   */
+  last_retarget: number 
+  
+  /* Block Hash thats referenced by previous_block */  
   indep_hash: string 
+  
+  /* indep_hash of previous block */
+  previous_block: string
+  
+  reward_addr: string
+  reward_pool: number 
+  block_size: number
+  weave_size: number
 }
 
 /**
  * tags.txId = null                         - if we haven't got the tags
  * tags.txId = { tag: value, tag: value }   - if we have the tags.
  */
-export type BlockTxTags = Record<string, null | Record<string, string>>
+
+export interface BlockTransaction {
+  id: string,
+  tags: DecodedTag[] | null
+}
 
 export interface SyncedBlock {
   info: RawBlock
-  tags: BlockTxTags
+  transactions: BlockTransaction[]
 }
 
 export interface BlockWatcherSubscriber {

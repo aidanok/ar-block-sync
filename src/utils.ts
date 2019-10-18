@@ -1,5 +1,5 @@
 import { RawBlock } from './types';
-import { decodeTag, tagsArrayToObject } from './arweave';
+import { decodeTag, tagsArrayToObject, DecodedTag } from './arweave';
 import 'cross-fetch/polyfill';
 
 /**
@@ -47,10 +47,10 @@ export async function getBlockByHash(hash: string): Promise<RawBlock> {
  * 
  * @param txId
  */
-export async function getTagsForTx(txId: string): Promise<Record<string, string>> {
+export async function getTagsForTx(txId: string): Promise<DecodedTag[]> {
   const resp = await fetch(`https://arweave.net/tx/${txId}/tags`).then(resp => resp.json());
   if (Array.isArray(resp)) {
-    return tagsArrayToObject(resp.map(decodeTag));
+    return resp.map(decodeTag);
   }
   console.warn(`Recevied non array trying to get tags for ${txId}`, resp);
   throw new Error(`Recevied non array trying to get tags for ${txId}: ${resp}`);

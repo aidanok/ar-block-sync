@@ -1,4 +1,4 @@
-import { SyncedBlock, SyncResult, BlockWatcherOptions, RawBlock, BlockTxTags } from './types';
+import { SyncedBlock, SyncResult, BlockWatcherOptions, RawBlock, BlockTransaction } from './types';
 import { getBlockAtHeight, range, getTagsForTx } from './utils';
 import { batch, batchWithProgress, BatchJob } from 'promises-tho';
 import { retryWithBackoff } from 'promises-tho';
@@ -20,7 +20,13 @@ const getTxTags = retryWithBackoff({ tries: 7 }, getTagsForTx);
 // throw if we cant retrieve tags. 
 const updateTxTags = ({ b, tx }: { b: SyncedBlock, tx: string }) => {
   return getTxTags(tx)
-  .then(tags => { b.tags[tx] = tags })
+  .then(tags => { 
+    const blockTx = b.transactions.find(t => t.id === tx);
+    if (!blockTx) {
+      throw new Error(`Block doesnt contain tx ${tx}. This is a bug, please fix.`)
+    }
+    blockTx.tags = tags; 
+  })
 }
 
 // Wrapped versions that execute in batches to not tie up all network connections
@@ -122,7 +128,7 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
   const oldestHeight = netInfo.height - options.blocksToSync;
 
   // the blocks we know we need to retrieve, we may need to 
-  // more if there was a re-org.
+  // retrieve more if there was a re-org.
   const blockHeights = range(netInfo.height-count+1, count);
 
   let job: BatchJob<number, RawBlock> = {
@@ -150,7 +156,7 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
   if (receviedRawBlocks[0].height === ourHeight + 1 && receviedRawBlocks[0].previous_block !== ourHash) {
     detectedReorg = true;
     log(`** Detected Re-org **`);
-    receviedRawBlocks.slice().reverse().forEach(b => {
+    receviedRawBlocks.forEach(b => {
       log(`Height: ${b.height}, Hash: ${b.indep_hash.substr(0,6)} - Prev: ${b.previous_block.substr(0, 6)}`);
     })
     log('^^ received blocks^^');
@@ -167,12 +173,14 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
   
   while (fixingReorg && height > oldestHeight) {
     
-    
+    log(`Fixing re-org, height: ${height}`);
     const [ourPrev, blockAtHeight] = await Promise.all([
       findInBlocks(height), // not async anymore 
       getBlock(height),
     ]);
-
+    log (`Fixing re-org: ourPrev: ${ourPrev && ourPrev.info.height}, Hash: ${ourPrev && ourPrev.info.indep_hash.substr(0, 4)}, Prev: ${ourPrev && ourPrev.info.previous_block.substr(0, 4)}`);
+    log (`Fixing re-org: newBlock: ${blockAtHeight.height}, Hash: ${blockAtHeight.indep_hash.substr(0, 4)}, Prev: ${blockAtHeight.previous_block.substr(0, 4)}`);
+    
     receviedRawBlocks.unshift(blockAtHeight);
     
     if (ourPrev) {
@@ -181,6 +189,7 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
     
     if (!ourPrev || blockAtHeight.previous_block === ourPrev.info.previous_block) {
       fixingReorg = false;
+      log(`Fixing re-org finished, height: ${height}, ourPrev?: ${!!ourPrev}`);
     }
     else {
       height--;
@@ -190,14 +199,12 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
   // Re-org checking finished.
 
   // All the new blocks we go, including any re-org.
-  const newBlocks = receviedRawBlocks.map(x => ({tags: {} as BlockTxTags, info: x }));
+  const newBlocks = receviedRawBlocks.map(x => ({
+      transactions: x.txs.map(id => ({ id, tags: null }) ), 
+      info: x
+    })
+  );
 
-  // set tags to 'null' to indicate they haven't been retrieved. 
-  for (const b of newBlocks) {
-    for (const txId of b.info.txs) {
-      b.tags[txId] = null;
-    }
-  }
 
   if (inBlocks.length) {
     log(`Prev blocks: ${inBlocks[0].info.height} -> ${inBlocks[inBlocks.length-1].info.height} (${inBlocks.length})`)
@@ -212,9 +219,11 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
   // get rid of discard blocks from the end of inBlocks, concat newBlocks, and trim to 
   // max size.
   const outBlocks = (
+    
     inBlocks
-    .slice(-discarded.length)
+    .slice(0, inBlocks.length-discarded.length)
     .concat(newBlocks)
+
   ).slice(-options.blocksToSync);
 
   log(`Final blocks: ${outBlocks[0].info.height} -> ${outBlocks[outBlocks.length-1].info.height} (${outBlocks.length})`);
@@ -223,9 +232,9 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
     log(`Retrieving TX tags`);
     const txBatch = [] as { b: SyncedBlock, tx: string}[];
     for (const b of outBlocks) {
-      for (const tx of b.info.txs) {
-        if (!b.tags[tx]) {
-          txBatch.push({ b, tx });
+      for (const tx of b.transactions) {
+        if (!tx.tags) {
+          txBatch.push({ b, tx: tx.id });
         }
       }
     }
