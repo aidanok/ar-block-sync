@@ -1,6 +1,6 @@
 
 import { levelDb } from './db';
-import { WatchedBlock } from '.';
+import { SyncedBlock } from './types';
 
 /**
  * Class to provide a persistent database of blocks.
@@ -24,9 +24,9 @@ export class BlocksDatabase {
   /**
    * Returns all blocks, ordered by block height, low->high
    */
-  public async allBlocks(): Promise<WatchedBlock[]> {
+  public async allBlocks(): Promise<SyncedBlock[]> {
     return new Promise((res, rej) => {
-      const blocks = [] as WatchedBlock[];
+      const blocks = [] as SyncedBlock[];
       this.db.createReadStream({ keyAsBuffer: false, valueAsBuffer: false, reverse: false })
         .on('data', data => {
           if (data.key && data.value) {
@@ -44,10 +44,10 @@ export class BlocksDatabase {
    * Return the current top height in the block database.
    * Returns undefined if we have no blocks.
    */
-  public findTopBlock(): Promise<WatchedBlock | undefined> {
+  public findTopBlock(): Promise<SyncedBlock | undefined> {
     return new Promise((res, rej) => {
       let height: number | undefined;
-      let block: WatchedBlock | undefined;
+      let block: SyncedBlock | undefined;
       this.db.createReadStream({ limit: 1, keyAsBuffer: false, valueAsBuffer: false, reverse: true })
         .on('data', (data: any) => {
           height = parseInt(data.key, 10);
@@ -71,7 +71,7 @@ export class BlocksDatabase {
    * @param height 
    * @param block 
    */
-  public updateBlock(height: number, block: WatchedBlock): Promise<void> {
+  public updateBlock(height: number, block: SyncedBlock): Promise<void> {
     if (!block.info.indep_hash) {
       console.error(block);
       throw new Error('Invalid block');
@@ -89,7 +89,7 @@ export class BlocksDatabase {
    * 
    * @param blocks 
    */
-  public async updateMultipleBlocks(blocks: WatchedBlock[]) {
+  public async updateMultipleBlocks(blocks: SyncedBlock[]) {
     const b = this.db.batch();
     
     Object.entries(blocks).forEach(([height, block]) => {
@@ -110,7 +110,7 @@ export class BlocksDatabase {
    * 
    * @param height 
    */
-  public async getBlock(height: number): Promise<WatchedBlock> {
+  public async getBlock(height: number): Promise<SyncedBlock> {
     const key = stringifyNumber(height);
     const val: any = await this.db.get(key)
     return JSON.parse(val);
@@ -123,7 +123,7 @@ export class BlocksDatabase {
    * 
    * @param height 
    */
-  public async tryGetBlock(height: number): Promise<WatchedBlock | undefined> {
+  public async tryGetBlock(height: number): Promise<SyncedBlock | undefined> {
     const key = stringifyNumber(height);
     const val: any = await this.db.tryGet(key);
     if (val) {
@@ -198,7 +198,7 @@ export class BlocksDatabase {
             console.log('got not key');
             return; 
           }
-          const wb: WatchedBlock = JSON.parse(data.value);
+          const wb: SyncedBlock = JSON.parse(data.value);
           const t = ((Date.now() / 1000) - wb.info.timestamp) / 60;
           console.log(`${++i} - ${data.key} - ${t.toFixed(2)} Minutes Ago, Hash:${wb.info.indep_hash.substr(0, 5)}, Prev: ${wb.info.previous_block.substr(0, 5)}`);
         })
