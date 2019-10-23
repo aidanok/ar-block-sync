@@ -32,11 +32,11 @@ If you would like to use this, you'll need to figure out how it fits your use-ca
 Uses https://www.npmjs.com/package/debug for debug logging and https://www.npmjs.com/package/promises-tho 
 for retries and batching network requests. 
 
-Enable `ar-block-sync:*` in your environment to see debug logs, or `ar-block-sync:*,promies-tho:*` if you want to see retrys and batch retrieval logs aswell.
+Enable `ar-block-sync:*` in your environment to see debug logs, or `ar-block-sync:*,promies-tho:*` if you want to see retries and batch retrieval logs aswell.
 
 Sample output of some logs where we see a new height but it takes some time to get propogated to all nodes: [./block-propogation-delay-handling.html] 
 
-We see first the block not being propogated to the node we try and get it from, that succeeds at the 3nd attempt, then
+We see first the block not being propogated to the node we try and get it from, that succeeds at the 3rd attempt, then
 one of the TX tags retrieval call fails over a few attemps also due to block propogation, but eventually succeeded. Even if that
 eventually failed (after another 1-2 minutes it would give up), the sync would just abort and try again a minute or so later.
 
