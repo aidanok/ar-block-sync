@@ -35,9 +35,9 @@ API is unlikely to change much.
 Uses https://www.npmjs.com/package/debug for debug logging and https://www.npmjs.com/package/promises-tho 
 for retries and batching network requests. 
 
-Enable `ar-block-sync:*` in your environment to see debug logs, or `ar-block-sync:*,promies-tho:*` if you want to see retries and batch retrieval logs aswell.
+Enable `ar-block-sync:*` in your environment to see debug logs, or `ar-block-sync:*,promises-tho:*` if you want to see retries and batch retrieval logs aswell.
 
-Sample output of some logs where we see a new height but it takes some time to get propogated to all nodes: [block-propogation-delay-handling.html]
+Sample output of some logs where we see a new height but it takes some time to get propogated to all nodes: [block-propogation-delay-handling.html](block-propogation-delay-handling.html)
 
 Most of the time you don't see this, but in this instance we learn of a new height before a) the block is propogated to all nodes, b) the tx tags are propogated to all nodes. This results in a few retries getting the new block data and a few more retries getting all the TX tags. If it had of exhausted retries (after about another 30-60 seconds), the sync iteration would have been aborted and tried again a minute or two later. 
 
