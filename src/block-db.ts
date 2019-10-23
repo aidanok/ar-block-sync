@@ -9,7 +9,11 @@ import { SyncedBlock } from './types';
  * that works in both the browser and node. It has a pretty wierd 
  * interface though with nodejs style readable streams, we translate 
  * these to promise based api where approriate. 
- *  
+ * 
+ * This class doesn't do a whole lot, except provide an interface to save/load
+ * 'blocks' indexed by height and abstract the storage mechanism. One thing
+ * we have to do for storing blocks sorted correctly is convert height numbers
+ * to strings padded with leading zeros as leveldb sorts lexographically.
  */
 
 export class BlocksDatabase {
@@ -20,7 +24,6 @@ export class BlocksDatabase {
     private db = levelDb(dbName, perist),
   ) {}
 
-  
   /**
    * Returns all blocks, ordered by block height, low->high
    */

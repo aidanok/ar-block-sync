@@ -1,9 +1,12 @@
 import { SyncedBlock, SyncResult, BlockWatcherOptions, RawBlock, BlockTransaction } from './types';
 import { getBlockAtHeight, range, getTagsForTx } from './utils';
-import { batch, batchWithProgress, BatchJob } from 'promises-tho';
-import { retryWithBackoff } from 'promises-tho';
+import { retryWithBackoff, batch, batchWithProgress, BatchJob } from 'promises-tho';
+import { DecodedTag } from './arweave';
 
 import debug from 'debug';
+
+// This method of import means the browsers native fetch() method WILL be used. 
+// The other method of import cross-fetch provides ends up using Xhr in the browser. 
 import 'cross-fetch/polyfill';
 
 // Configure some functions we will use later. The retries are quite
@@ -16,11 +19,34 @@ const getBlock = retryWithBackoff({ tries: 7 }, getBlockAtHeight);
 // network op wrapped with backoff.
 const getTxTags = retryWithBackoff({ tries: 7 }, getTagsForTx);
 
+// TODO: move somewhere else. 
+const graphQlTags = async (id: string) => {
+  const qlQuery = `query {
+    transaction(id: "${id}") {
+      id,
+      tags {
+        name,
+        value
+      }
+    }
+  }`
+  const resp = await fetch(`https://arweave.net/arql`,{ method: 'POST', body: JSON.stringify({ query: qlQuery }) })
+  const data = await resp.json()
+  if (data.data.transaction.id !== id || !Array.isArray(data.data.transaction.tags)) {
+    console.error(data);
+    throw new Error(`Unexpected response: ${JSON.stringify(data)}`);
+  }
+  return data.data.transaction.tags as DecodedTag[];
+}
+
+// Un-used atm, TODO: provide user option to use graphql or arql to retrieve tags.
+const getTxTagsGraphQl = retryWithBackoff({ tries: 3, pow: 5 }, graphQlTags);
+
 // update the WatchedBlock with the result of a tags retrieval 
 // throw if we cant retrieve tags. 
 const updateTxTags = ({ b, tx }: { b: SyncedBlock, tx: string }) => {
   return getTxTags(tx)
-  .then(tags => { 
+  .then(tags => {
     const blockTx = b.transactions.find(t => t.id === tx);
     if (!blockTx) {
       throw new Error(`Block doesnt contain tx ${tx}. This is a bug, please fix.`)
@@ -32,9 +58,9 @@ const updateTxTags = ({ b, tx }: { b: SyncedBlock, tx: string }) => {
 // Wrapped versions that execute in batches to not tie up all network connections
 // while retrieving multiple items at once. 
 
-const getBlocksBatch = batchWithProgress({ batchSize: 4, batchDelayMs: 250 }, getBlock);
+const getBlocksBatch = batchWithProgress({ batchSize: 4, batchDelayMs: 150 }, getBlock);
 
-const updateTxTagsBatch = batch({ batchSize: 2, batchDelayMs: 350 }, updateTxTags);
+const updateTxTagsBatch = batch({ batchSize: 4, batchDelayMs: 150 }, updateTxTags);
 
 const log = debug('ar-block-sync:sync');
  
@@ -60,7 +86,7 @@ export function consistencyCheck(blocks: SyncedBlock[]): void {
  */
 export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatcherOptions): Promise<SyncResult> {
      
-  log(`Polling`);
+  log(`syncIteration starting`);
  
   const findInBlocks = (height: number) => inBlocks.find(x => x.info.height === height);
  
@@ -159,13 +185,14 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
     receviedRawBlocks.forEach(b => {
       log(`Height: ${b.height}, Hash: ${b.indep_hash.substr(0,6)} - Prev: ${b.previous_block.substr(0, 6)}`);
     })
-    log('^^ received blocks^^');
+    log('^^ received blocks ^^');
     log(`Height: ${ourHeight}, Hash: ${ourHash.substr(0, 6)}`);
     log('^^ our top ^^');
   }
   
   // Vars we need for sorting out re-org, wont be used in 
-  // most cases. We just walk back one block at a time. 
+  // most cases. 
+  // We just walk back one block at a time. 
     
   let fixingReorg = detectedReorg;
   let discarded = [] as SyncedBlock[];
@@ -181,6 +208,7 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
     log (`Fixing re-org: ourPrev: ${ourPrev && ourPrev.info.height}, Hash: ${ourPrev && ourPrev.info.indep_hash.substr(0, 4)}, Prev: ${ourPrev && ourPrev.info.previous_block.substr(0, 4)}`);
     log (`Fixing re-org: newBlock: ${blockAtHeight.height}, Hash: ${blockAtHeight.indep_hash.substr(0, 4)}, Prev: ${blockAtHeight.previous_block.substr(0, 4)}`);
     
+    // received blocks sorted low->high so insert at start of array.
     receviedRawBlocks.unshift(blockAtHeight);
     
     if (ourPrev) {
@@ -194,11 +222,13 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
     else {
       height--;
     }
+
   }
 
   // Re-org checking finished.
 
-  // All the new blocks we go, including any re-org.
+  // All the new blocks we got, including any re-org, 
+  // convert to SyncedBlock, leave tags blank for now.
   const newBlocks = receviedRawBlocks.map(x => ({
       transactions: x.txs.map(id => ({ id, tags: null }) ), 
       info: x
@@ -218,12 +248,11 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
 
   // get rid of discard blocks from the end of inBlocks, concat newBlocks, and trim to 
   // max size.
+  
   const outBlocks = (
-    
     inBlocks
-    .slice(0, inBlocks.length-discarded.length)
+    .slice(0, inBlocks.length - discarded.length)
     .concat(newBlocks)
-
   ).slice(-options.blocksToSync);
 
   log(`Final blocks: ${outBlocks[0].info.height} -> ${outBlocks[outBlocks.length-1].info.height} (${outBlocks.length})`);
@@ -242,11 +271,14 @@ export async function syncIteration(inBlocks: SyncedBlock[], options: BlockWatch
     await updateTxTagsBatch(txBatch);
   }
 
+  // did we miss any blocks?
+  const missed = newBlocks[newBlocks.length-1].info.height < ourHeight;
+
   const syncResult: SyncResult = {
     synced: newBlocks.length,
     reorg: detectedReorg,
-    missed: newBlocks.length === outBlocks.length, 
     list: outBlocks,
+    missed, 
     discarded
   }
 

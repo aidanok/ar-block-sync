@@ -10,8 +10,9 @@ import debug from "debug";
 
 /**
  * Observable that can be shared between multiple subscribers and 
- * replays the last value to them when they subscribe. Generally you 
- * should use this over the direct source observable.
+ * replays the last value to them when they subscribe. 
+ * 
+ * You should use this over the direct source observable.
  * 
  * @param opts 
  */
@@ -24,16 +25,17 @@ export function arBlocks(opts?: Partial<BlockWatcherOptions>): Observable<SyncRe
 /**
  * 
  * The source Observable. This runs the 'main' loop that first loads blocks from persistence,
- * runs a syncIteration, and persists blocks back. 
+ * runs a syncIteration, and persists the blocks back. 
  * 
- * Its written as an Observable just to take advantage of RxJs subscriber, sharing, replay 
- * functionalities. 
+ * Its written as an RxJs Observable to take advantage of RxJs subscriber, sharing, replay 
+ * functionalities, Observable is also becoming a tc39 standard. Consumers dont have to nessecarily
+ * know or use RxJs to use. See console-test2.ts for example usage.
  * 
- * TODO: support syncing higher counts of blocks by 
- *  - only persisting new or changed blocks
- *  - not nessecarily loading the entire block list, or passing the entire block list
- *  - to syncIteration. 
- * 
+ * TODO: support syncing higher counts of blocks by: 
+ *    - not nessecarily loading the entire block list, or passing the entire block list to syncIteration. 
+ *    - only persisting back new blocks to avoid serialization, currently we just persist back the entire list
+ *      for simplicity.
+ *  
  * TODO: support increasing the amount of blocks to sync without just clearing the DB. 
  *       just needs the ability to retrieve blocks starting from the bottom of the list we
  *       already have.
@@ -42,8 +44,8 @@ export function arBlocks(opts?: Partial<BlockWatcherOptions>): Observable<SyncRe
  * @param opts 
  */
 export function blocksObservable(opts?: Partial<BlockWatcherOptions>): Observable<SyncResult> {
-  const options: BlockWatcherOptions = 
   
+  const options: BlockWatcherOptions = 
   Object.assign({
     minPollTime: 100,
     maxPollTime: 200,
