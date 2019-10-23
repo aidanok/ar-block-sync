@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<body>
+
 <pre style="background: rgb(0,0,0); color: rgb(220,220,200);">
   <font color="#729FCF"><b>ar-blocks:sync </b></font>Polling <font color="#3465A4">+20s</font>
   <font color="#729FCF"><b>ar-blocks:sync </b></font>Top is synced, nothing to do. <font color="#3465A4">+136ms</font>
@@ -55,5 +53,3 @@
   <font color="#729FCF"><b>ar-blocks:main </b></font>synced blocks: 302605 -&gt; 302624 <font color="#3465A4">+1m</font>
   <font color="#729FCF"><b>ar-blocks:main </b></font>persisted 20 blocks, trimming past 302605 <font color="#3465A4">+2ms</font>
 </pre>
-</body>
-</html>
