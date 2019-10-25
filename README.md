@@ -20,6 +20,14 @@ This can be used for various things:
 - Other? 
 
 
+With GraphQL coming, and implemnetation of this library becomes  much simpler since we can just do 
+a query for ( blocks >= 400000 AND txtags == 'xyz' ) or similar. You may not even need a library anymore, but
+probably there still some cases where it will be useful. GraphQL will also allow this library to be more efficient/scalable, 
+since we can retrieve TX metadata only for the TXs we are interested in. Currently if retrieve tags is enabled
+it retrieves tags for all TXs, which could become a problem if there was hundreds of TXs per block. 
+
+The data format it uses aligns with the GraphQl schema. It uses the old /tags endpoint at the moment, though there is code to use the graphql endpoint instead. No ArQL queries are used. 
+
 
 
 Currently, its suited for syncing block counts in 10-150 ish range, with a bit of adjustment it would work for much higher counts. 
