@@ -1,5 +1,5 @@
 
-import { levelDb } from './db';
+import { levelDb, Db } from './db';
 import { SyncedBlock } from './types';
 
 /**
@@ -18,19 +18,28 @@ import { SyncedBlock } from './types';
 
 export class BlocksDatabase {
   
+  
+  private isOpen = false; 
+  private initPromise: Promise<Db>
+
   constructor(
     private dbName = '.db.ar-block-db',
     private perist = true,
-    private db = levelDb(dbName, perist),
-  ) {}
+  ) {
+    this.initPromise = levelDb(dbName, perist)
+  }
+
+
 
   /**
    * Returns all blocks, ordered by block height, low->high
    */
   public async allBlocks(): Promise<SyncedBlock[]> {
+    const db = await this.initPromise;
+
     return new Promise((res, rej) => {
       const blocks = [] as SyncedBlock[];
-      this.db.createReadStream({ keyAsBuffer: false, valueAsBuffer: false, reverse: false })
+      db.createReadStream({ keyAsBuffer: false, valueAsBuffer: false, reverse: false })
         .on('data', data => {
           if (data.key && data.value) {
             const height: number = parseInt(data.key, 10);
@@ -47,11 +56,12 @@ export class BlocksDatabase {
    * Return the current top height in the block database.
    * Returns undefined if we have no blocks.
    */
-  public findTopBlock(): Promise<SyncedBlock | undefined> {
+  public async findTopBlock(): Promise<SyncedBlock | undefined> {
+    const db = await this.initPromise;
     return new Promise((res, rej) => {
       let height: number | undefined;
       let block: SyncedBlock | undefined;
-      this.db.createReadStream({ limit: 1, keyAsBuffer: false, valueAsBuffer: false, reverse: true })
+      db.createReadStream({ limit: 1, keyAsBuffer: false, valueAsBuffer: false, reverse: true })
         .on('data', (data: any) => {
           height = parseInt(data.key, 10);
           block = JSON.parse(data.value);
@@ -74,13 +84,15 @@ export class BlocksDatabase {
    * @param height 
    * @param block 
    */
-  public updateBlock(height: number, block: SyncedBlock): Promise<void> {
-    if (!block.info.indep_hash) {
+  public async updateBlock(height: number, block: SyncedBlock): Promise<void> {
+    const db = await this.initPromise;
+
+    if (!block.info.indep_hash || typeof block.info.height !== 'number') {
       console.error(block);
       throw new Error('Invalid block');
     }
-    const key = stringifyNumber(height);
-    return this.db.put(key, JSON.stringify(block));
+    const key = stringifyNumber(block.info.height);
+    return db.put(key, JSON.stringify(block));
   }
 
   /**
@@ -93,8 +105,10 @@ export class BlocksDatabase {
    * @param blocks 
    */
   public async updateMultipleBlocks(blocks: SyncedBlock[]) {
-    const b = this.db.batch();
+    const db = await this.initPromise;
     
+    const b = db.batch();
+
     Object.entries(blocks).forEach(([height, block]) => {
       if (!block.info.indep_hash) {
         console.error(block);
@@ -114,8 +128,10 @@ export class BlocksDatabase {
    * @param height 
    */
   public async getBlock(height: number): Promise<SyncedBlock> {
+    const db = await this.initPromise;
+
     const key = stringifyNumber(height);
-    const val: any = await this.db.get(key)
+    const val: any = db.get(key)
     return JSON.parse(val);
   }
 
@@ -127,8 +143,9 @@ export class BlocksDatabase {
    * @param height 
    */
   public async tryGetBlock(height: number): Promise<SyncedBlock | undefined> {
+    const db = await this.initPromise;
     const key = stringifyNumber(height);
-    const val: any = await this.db.tryGet(key);
+    const val = await db.tryGet(key);
     if (val) {
       return JSON.parse(val);
     }
@@ -140,9 +157,11 @@ export class BlocksDatabase {
    */
   public async count(): Promise<number> {
     // prob smart to cache this or store in db itself.
+    const db = await this.initPromise;
+
     return new Promise((res, rej) => {
       let count = 0;
-      this.db.createReadStream({ keys: true, values: false })
+      db.createReadStream({ keys: true, values: false })
       .on('data', (d) => {
         if (d !== undefined) {
           count++;
@@ -159,9 +178,11 @@ export class BlocksDatabase {
    * @param height blocks below this height will be removed from the db.
    */
   public async trimPastHeight(height: number) {
+    const db = await this.initPromise;
+
     return new Promise((res, rej) => {
-      const b = this.db.batch();
-      this.db.createReadStream({ keysOnly: true, keyAsBuffer: false, lt: stringifyNumber(height) })
+      const b = db.batch();
+      db.createReadStream({ keysOnly: true, keyAsBuffer: false, lt: stringifyNumber(height) })
       .on('data', data => {
         if (data !== undefined) {
           b.del(data.key);
@@ -178,8 +199,10 @@ export class BlocksDatabase {
    * Clears the entire database.
    */
   public async clearDb() {
-    if (typeof (this.db as any)['clear'] === 'function') {
-      return (this.db as any).clear();
+    const db = await this.initPromise;
+
+    if (typeof (db as any)['clear'] === 'function') {
+      return (db as any).clear();
     } else {
       // TODO: manually iterate all keys and delete, some levelup impls 
       // may not have a clear() method.
@@ -192,10 +215,12 @@ export class BlocksDatabase {
    * Debug method to print a list of time, block hash and prev_hash to console.
    * 
    */
-  public debugDump() {
+  public async debugDump() {
+    const db = await this.initPromise;
+
     return new Promise((res) => {
       let i = 0;
-      this.db.createReadStream({ reverse: true })
+      db.createReadStream({ reverse: true })
         .on('data', (data) => {
           if (!data.key) {
             console.log('got not key');

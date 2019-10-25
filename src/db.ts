@@ -16,6 +16,8 @@ type TryGet =  { tryGet(key: any): Promise<any> }
 
 type LevelDb = LevelUp<any, AbstractIterator<any, any>>
 
+export type Db = LevelDb & TryGet; 
+
 /**
  * Creates a levelup database. 
  * Returns a standard levelup interface with one 
@@ -26,12 +28,29 @@ type LevelDb = LevelUp<any, AbstractIterator<any, any>>
  * 
  * @param name Name of the database.
  */
-export function levelDb(name: string, persist = true): (LevelDb & TryGet) {
-  const db = levelup(persist ? ld(name) : memdown());
+export async function levelDb(name: string, persist = true): Promise<(LevelDb & TryGet)> {
+  return new Promise((res, rej) => {
+    const db = levelup(persist ? ld(name) : memdown(), undefined, (er) => {
+      if (er) {
+        console.error(er);
+        console.error('Caugh error opening Db!');
+        console.log(`is In browser?: ${typeof indexedDB === 'undefined'}` )
+        rej(er);
+      }
+      addTryGet(db);
+      res(db as LevelDb & TryGet);
+    });
   
+    
+  })
+   
+}
+
+
+function addTryGet(db: any) {
   // add tryGet method, a get() that doesn't throw on key not found errors, but
   // returns undefined instead.
-  (db as any).tryGet = async (key: any): Promise<any> => {
+  db.tryGet = async (key: any): Promise<any> => {
     let val: any = undefined;
     try {
       val = await db.get(key);
@@ -44,6 +63,4 @@ export function levelDb(name: string, persist = true): (LevelDb & TryGet) {
     }
     return val;
   }
-
-  return db as LevelDb & TryGet; 
 }
