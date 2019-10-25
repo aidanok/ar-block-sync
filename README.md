@@ -20,6 +20,8 @@ This can be used for various things:
 - Other? 
 
 
+
+
 Currently, its suited for syncing block counts in 10-150 ish range, with a bit of adjustment it would work for much higher counts. 
 
 It ships with 'polite' network settings, it will poll every 100-200 seconds and if tx tag retrieval is
@@ -28,9 +30,14 @@ you are using it from a browser dapp, but also just so we don't hammer nodes/gat
 
 If you would like to use this, you'll need to figure out how it fits your use-case, still version 0.1.0, but you can start by checking:
 
-[src/console-test2.ts](src/console-test2.ts) and [src/types.ts](src/types.ts) 
+[src/console-test2.ts](src/console-test2.ts), [src/types.ts](src/types.ts), [src/observable.ts](src/observable.ts)
 
 API is unlikely to change much. 
+
+Currently this only published on the arweave blockchain: 
+
+`npm install https://e5hareckrltt.arweave.net/f-8pqMhEMM1v8BlhN81yazG_P7og_Yfzv1lAeE27B1o`
+
 
 Uses https://www.npmjs.com/package/debug for debug logging and https://www.npmjs.com/package/promises-tho 
 for retries and batching network requests. 
