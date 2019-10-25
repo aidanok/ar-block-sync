@@ -51,8 +51,10 @@ export interface RawBlock {
 }
 
 /**
- * tags.txId = null                         - if we haven't got the tags
- * tags.txId = { tag: value, tag: value }   - if we have the tags.
+ * BlockTransaction aligns with the GraphQL schema for a transaction. 
+ * 
+ * tags = null                                  - if we haven't got the tags
+ * tags = [{ name: string, value: string }, ... ]    - if we have the tags.
  */
 
 export interface BlockTransaction {
@@ -60,23 +62,43 @@ export interface BlockTransaction {
   tags: DecodedTag[] | null
 }
 
+/**
+ * An individual block we have synced. 
+ */
 export interface SyncedBlock {
   info: RawBlock
   transactions: BlockTransaction[]
 }
 
-export interface BlockWatcherSubscriber {
-  (sync: SyncResult): void
-}
 
-export interface SubscriberOptions {
-  tags?: (tags: Record<string, string>) => boolean
-}
-
+/**
+ * The result of a sync iteration. 
+ */
 export interface SyncResult {
+  
+  /**
+   * The number of new blocks we have synced in this iteration, these will be the last N blocks in `list`
+   */
   synced: number,
+
+  /**
+   * The entire list of blocks we have synced. You should not mutate this array or data. 
+   */
   list: SyncedBlock[],
+
+  /**
+   * If we missed any blocks since we last synced, this will be true when we first start or 
+   * when we have lost connectivity for long enough to miss blocks. 
+   */
   missed: boolean,
+
+  /**
+   * If we saw a re-org in the last sync iteration, implies discard.length > 0 
+   */
   reorg: boolean,
+  
+  /**
+   * A list of the blocks that were discarded due to a re-org in the last iteration.
+   */
   discarded: SyncedBlock[]
 }
