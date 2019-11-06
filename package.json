@@ -44,5 +44,8 @@
     "@pika/types": "0.6.1",
     "ts-node": "8.4.1",
     "typescript": "3.6.4"
+  },
+  "scripts": {
+    "build": "pika build && tar -czvf ar-block-sync.tgz pkg/"
   }
 }
