@@ -56,6 +56,40 @@ export async function getTagsForTx(txId: string): Promise<DecodedTag[]> {
   throw new Error(`Recevied non array trying to get tags for ${txId}: ${resp}`);
 }
 
+
+/**
+ * Gets tags for a tx via the GraphQL endpoint. 
+ * 
+ * This is not currently used. GraphQl used to return 
+ * more tags (from, quantity, reward, etc) but currently it 
+ * provides no advantage over the /tags endpoint when retrieving
+ * for a single Tx. 
+ * 
+ * GraphQL *does* allow us to batch get tags for multiple TXs in 
+ * one request, (by using multiple top level named queries) but
+ * this function does not do that.
+ * 
+ * @param id 
+ */
+export async function getTagsForTxGraphQl(id: string) {
+  const qlQuery = `query {
+    transaction(id: "${id}") {
+      id,
+      tags {
+        name,
+        value
+      }
+    }
+  }`
+  const resp = await fetch(`https://arweave.net/arql`,{ method: 'POST', body: JSON.stringify({ query: qlQuery }) })
+  const data = await resp.json()
+  if (data.data.transaction.id !== id || !Array.isArray(data.data.transaction.tags)) {
+    console.error(data);
+    throw new Error(`Unexpected response: ${JSON.stringify(data)}`);
+  }
+  return data.data.transaction.tags as DecodedTag[];
+}
+
 /**
  * Wait a random period of time between min and max seconds. 
  * 

@@ -19,28 +19,6 @@ const getBlock = retryWithBackoff({ tries: 7 }, getBlockAtHeight);
 // network op wrapped with backoff.
 const getTxTags = retryWithBackoff({ tries: 7 }, getTagsForTx);
 
-// TODO: move somewhere else. 
-const graphQlTags = async (id: string) => {
-  const qlQuery = `query {
-    transaction(id: "${id}") {
-      id,
-      tags {
-        name,
-        value
-      }
-    }
-  }`
-  const resp = await fetch(`https://arweave.net/arql`,{ method: 'POST', body: JSON.stringify({ query: qlQuery }) })
-  const data = await resp.json()
-  if (data.data.transaction.id !== id || !Array.isArray(data.data.transaction.tags)) {
-    console.error(data);
-    throw new Error(`Unexpected response: ${JSON.stringify(data)}`);
-  }
-  return data.data.transaction.tags as DecodedTag[];
-}
-
-// Un-used atm, TODO: provide user option to use graphql or arql to retrieve tags.
-const getTxTagsGraphQl = retryWithBackoff({ tries: 3, pow: 5 }, graphQlTags);
 
 // update the WatchedBlock with the result of a tags retrieval 
 // throw if we cant retrieve tags. 
