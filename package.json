@@ -46,6 +46,7 @@
     "typescript": "3.6.4"
   },
   "scripts": {
-    "build": "pika build && tar -czvf ar-block-sync.tgz pkg/"
+    "build": "pika build && tar -czvf ar-block-sync.tgz pkg/",
+    "clean": "rm -rf .db*"
   }
 }
