@@ -36,9 +36,9 @@ const updateTxTags = ({ b, tx }: { b: SyncedBlock, tx: string }) => {
 // Wrapped versions that execute in batches to not tie up all network connections
 // while retrieving multiple items at once. 
 
-const getBlocksBatch = batchWithProgress({ batchSize: 3, batchDelayMs: 100 }, getBlock);
+const getBlocksBatch = batchWithProgress({ batchSize: 7, batchDelayMs: 100 }, getBlock);
 
-const updateTxTagsBatch = batch({ batchSize: 3, batchDelayMs: 100 }, updateTxTags);
+const updateTxTagsBatch = batch({ batchSize: 7, batchDelayMs: 100 }, updateTxTags);
 
 const log = debug('ar-block-sync:sync');
  
