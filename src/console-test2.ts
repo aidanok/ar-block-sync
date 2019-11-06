@@ -10,9 +10,10 @@ arBlocks({
   startupDelay: 0,
   persist: true,
   retrieveTags: true,
-  minPollTime: 10,
+  minPollTime: 6,
   maxPollTime: 30,
+  blocksToSync: 20,
 })
 .subscribe(x => {
-  log(inspect(x));
+  inspect(x);
 })
